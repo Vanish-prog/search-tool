@@ -1,0 +1,132 @@
+[
+  {
+    "name": "absl_py-2.5.1-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/b3/7d/01e62f59e4166af1be6238d9f2b7f3453630c51b8044b412d05b5606532a/absl_py-2.5.1-py3-none-any.whl",
+    "sha256": "721200f2f0e9960f2ca9dc3a2a706b201f5f75d812c158f059cbbe29eeafbdb8"
+  },
+  {
+    "name": "click-8.5.0-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/58/50/6c0d534c5f134586a8e1ba4e330569e32f057e33372ae556463212fb4cd3/click-8.5.0-py3-none-any.whl",
+    "sha256": "255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360"
+  },
+  {
+    "name": "et_xmlfile-2.0.0-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/c1/8b/5fe2cc11fee489817272089c4203e679c63b570a5aaeb18d852ae3cbba6a/et_xmlfile-2.0.0-py3-none-any.whl",
+    "sha256": "7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa"
+  },
+  {
+    "name": "flatbuffers-25.12.19-py2.py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl",
+    "sha256": "7634f50c427838bb021c2d66a3d1168e9d199b0607e6329399f04846d42e20b4"
+  },
+  {
+    "name": "iniconfig-2.3.1-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl",
+    "sha256": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7"
+  },
+  {
+    "name": "litert_lm-0.18.0-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/7d/47/d873e8f53be07fc6c9e412234adcb6345d6356abbd7a8f115c473d32207d/litert_lm-0.18.0-py3-none-any.whl",
+    "sha256": "fa22fb54598aa8593bce29c5816fa40eb1d00d2dc56e689a00019b4ad7a6da12"
+  },
+  {
+    "name": "litert_lm_api-0.18.0-py3-none-manylinux_2_27_x86_64.whl",
+    "url": "https://files.pythonhosted.org/packages/c9/8f/eb7a5203be1d48440c6b8d6e6382c3f744dd6d338fe400555718b4d695a1/litert_lm_api-0.18.0-py3-none-manylinux_2_27_x86_64.whl",
+    "sha256": "b64e2cf6d7dcb90ff094b74af595cc5d53faa07e0889f967d15df8d3e696b53c"
+  },
+  {
+    "name": "litert_lm_builder-0.18.0-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/3c/c6/7edea6f665610b9a0c33d9de005ac619a4a96d60e7a07a7f0fe0b86a6846/litert_lm_builder-0.18.0-py3-none-any.whl",
+    "sha256": "77a0969bcab6a89a32861887fc45bb6cc6683ac64e2b43fc84fd4074c8879903"
+  },
+  {
+    "name": "lxml-6.1.3-cp312-cp312-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl",
+    "url": "https://files.pythonhosted.org/packages/0a/20/e022dbc6b4753a9bc9fc5fb28a27163430c1731b9913997f6544c1b2518c/lxml-6.1.3-cp312-cp312-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl",
+    "sha256": "909f4e927bb051f7740d6367285fc60cdcfdaf0258c2dba4ff5ba7eadadc250c"
+  },
+  {
+    "name": "numpy-2.5.4-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+    "url": "https://files.pythonhosted.org/packages/43/a3/c799c62e19c337e6d3770b08e475887fb30ce8477d3c09efca6b2f0228a6/numpy-2.5.4-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+    "sha256": "fbde6962867ee75b48b0ee29b2b9372ec5d617799dbaf38e82dc0596f2f7738a"
+  },
+  {
+    "name": "openpyxl-3.1.5-py2.py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/c0/da/977ded879c29cbd04de313843e76868e6e13408a94ed6b987245dc7c8506/openpyxl-3.1.5-py2.py3-none-any.whl",
+    "sha256": "5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2"
+  },
+  {
+    "name": "packaging-26.3-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl",
+    "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"
+  },
+  {
+    "name": "pillow-12.3.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+    "url": "https://files.pythonhosted.org/packages/84/21/a35af28dcc61f37ed850a2d64c65c701321dfbf25085e469d5559360cbbf/pillow-12.3.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+    "sha256": "78cb2c6865a35ab8ff8b75fd122f6033b92a62c82801110e48ddd6c936a45d91"
+  },
+  {
+    "name": "pluggy-1.6.0-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl",
+    "sha256": "e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746"
+  },
+  {
+    "name": "prompt_toolkit-3.0.53-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/54/6f/84908cad2d6aa5144abcf7b42709fe4fdb459bc640ec7ac5786e7693dabc/prompt_toolkit-3.0.53-py3-none-any.whl",
+    "sha256": "01c0891d7f9237d5e339f7d3e42cdae80b7534abb1c7c0e3352efba6231492f2"
+  },
+  {
+    "name": "protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl",
+    "url": "https://files.pythonhosted.org/packages/db/f3/3996583dd2906297a637af12114deddf7658af6e683fedb83be061983fb5/protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl",
+    "sha256": "89f23aa53c24553a2416fd4fd1ec06f74fa42b14b546d8883128813f775bbfd2"
+  },
+  {
+    "name": "pygments-2.21.0-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/71/46/17f022dd3e953bf20a04a028a21ec746d942f8d2af30fa0f124fa0e6a684/pygments-2.21.0-py3-none-any.whl",
+    "sha256": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9"
+  },
+  {
+    "name": "pypdf-6.20.1-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/71/f8/4cbd09988b4b158260b7e0df38bf16f19e998bf0e257a18661a8da04280e/pypdf-6.20.1-py3-none-any.whl",
+    "sha256": "aa5a55ddcffdc5e5ab291d5decb23f6383f4e56f8e3263dc39af41fff03885ad"
+  },
+  {
+    "name": "pytest-9.1.1-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl",
+    "sha256": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c"
+  },
+  {
+    "name": "python_docx-1.2.0-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/d0/00/1e03a4989fa5795da308cd774f05b704ace555a70f9bf9d3be057b680bcf/python_docx-1.2.0-py3-none-any.whl",
+    "sha256": "3fd478f3250fbbbfd3b94fe1e985955737c145627498896a8a6bf81f4baf66c7"
+  },
+  {
+    "name": "python_pptx-1.0.2-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/d9/4f/00be2196329ebbff56ce564aa94efb0fbc828d00de250b1980de1a34ab49/python_pptx-1.0.2-py3-none-any.whl",
+    "sha256": "160838e0b8565a8b1f67947675886e9fea18aa5e795db7ae531606d68e785cba"
+  },
+  {
+    "name": "questionary-2.1.1-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/3c/26/1062c7ec1b053db9e499b4d2d5bc231743201b74051c973dadeac80a8f43/questionary-2.1.1-py3-none-any.whl",
+    "sha256": "a51af13f345f1cdea62347589fbb6df3b290306ab8930713bfae4d475a7d4a59"
+  },
+  {
+    "name": "tomli-2.5.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+    "url": "https://files.pythonhosted.org/packages/43/90/6090e706ff27a6f89f4a40578e3324b95c3cd8c4150868aabf33a8f414c3/tomli-2.5.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+    "sha256": "6cf74416bdc94ae458b14e37286c1073081850ac8459a00d0c5efef5d44294c6"
+  },
+  {
+    "name": "typing_extensions-4.16.0-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl",
+    "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"
+  },
+  {
+    "name": "wcwidth-0.9.2-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+    "url": "https://files.pythonhosted.org/packages/db/6c/f940133c71427c208575910e981942bd78c98b1f7cd0d1425ca4b7457c04/wcwidth-0.9.2-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+    "sha256": "751bef0ab404b6a1dc028b56b4b85d46486be1c55833f80da533e42dc691f389"
+  },
+  {
+    "name": "xlsxwriter-3.2.9-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/3a/0c/3662f4a66880196a590b202f0db82d919dd2f89e99a27fadef91c4a33d41/xlsxwriter-3.2.9-py3-none-any.whl",
+    "sha256": "9a5db42bc5dff014806c58a20b9eae7322a134abb6fce3c92c181bfb275ec5b3"
+  }
+]

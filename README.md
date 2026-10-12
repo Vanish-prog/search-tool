@@ -2,6 +2,12 @@
 
 Local Linux directory search powered by **EmbeddingGemma 2**, not a text-only substitute. Text prompts and reference images/audio/documents share the model's 768-dimensional embedding space. Processing and search are local; internet is needed only for installation and the initial model download.
 
+## AI authorship and license
+
+**This project is completely authored by AI**, including its application code, tests, packaging, and documentation, under human direction. It is experimental software; passing tests does not guarantee correctness or security. Review it before using it with sensitive files.
+
+The project source is available under the **MIT License** (see [LICENSE](LICENSE)). Third-party dependencies and model weights retain their own licenses; the project's MIT license does not relicense them.
+
 ## Run
 
 ```sh
@@ -32,13 +38,46 @@ Limits: text 32 MiB, Office ZIP uncompressed content 64 MiB, recordings 2 hours;
 
 ## NixOS installation
 
+The flake provides a self-contained **x86_64-linux** package: Python, locked Python wheels, FFmpeg, Poppler, and native runtime paths are supplied by Nix. It does not depend on the checkout's virtual environment or `~/.local/bin`. ARM Linux and other architectures are not packaged yet.
+
+```sh
+# Run without permanently installing:
+nix run github:Vanish-prog/search-tool -- --help
+
+# Install into your user profile:
+nix profile install github:Vanish-prog/search-tool
+findmatch --help
+
+# Build a local checkout:
+nix build .#findmatch
+./result/bin/findmatch --help
+```
+
+Flakes and `nix-command` must be enabled. For reproducible deployment, pin a Git commit or use the flake from your NixOS/Home Manager lockfile. Downloads happen during Nix dependency fetches; the package's install phase uses only hash-verified wheels offline. Model weights are not in the Nix package and retain the separate first-run download prompt.
+
+To add it to a NixOS flake:
+
+```nix
+# In flake.nix inputs:
+search-tool.url = "github:Vanish-prog/search-tool";
+
+# In a module receiving inputs through specialArgs:
+environment.systemPackages = [
+  inputs.search-tool.packages.${pkgs.stdenv.hostPlatform.system}.findmatch
+];
+```
+
+With Home Manager, use the same package expression in `home.packages`. No service is enabled automatically.
+
+### Development installation
+
 ```sh
 cd /path/to/search-tool
 ./install-nixos.sh
 findmatch --help
 ```
 
-The installer builds a Nix-rooted runtime (Python 3.12, uv, FFmpeg, Poppler, C++ runtime), syncs pinned Python dependencies from `uv.lock`, and installs a symlink in `~/.local/bin`. It does not modify `/etc/nixos`, rebuild the system, or start a service. Keep this project directory in place. Ensure `~/.local/bin` is on PATH.
+The development installer builds a Nix-rooted runtime, syncs `uv.lock`, and links the checkout's launcher into `~/.local/bin`; keep the checkout in place and ensure that directory is on PATH. Prefer the flake package for installation on other machines.
 
 For other Linux distributions with Python 3.12+ and FFmpeg/Poppler installed:
 
