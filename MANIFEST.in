@@ -1,0 +1,3 @@
+include README.md IDEA.md uv.lock runtime.nix install-nixos.sh
+include bin/findmatch
+recursive-include examples *

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+root="$(dirname -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")")"
+export PATH="$root/.nix-runtime/bin:$PATH"
+export LD_LIBRARY_PATH="$root/.nix-runtime/lib:${LD_LIBRARY_PATH:-}"
+export TMPDIR="${TMPDIR:-${XDG_CACHE_HOME:-$HOME/.cache}/findmatch/tmp}"
+mkdir -p -- "$TMPDIR"
+exec "$root/.venv/bin/python" -m search_tool.cli "$@"

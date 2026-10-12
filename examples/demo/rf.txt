@@ -1,0 +1,1 @@
+Antenna calibration procedure. Measure RF gain, impedance, and radiation pattern using a network analyzer.

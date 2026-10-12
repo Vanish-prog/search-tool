@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "findmatch"
+version = "0.1.0"
+description = "Local multimodal directory search with EmbeddingGemma 2"
+requires-python = ">=3.12,<3.15"
+dependencies = ["litert-lm==0.18.0", "numpy>=2,<3", "Pillow>=11,<13", "pypdf>=6,<7", "python-docx>=1.2,<2", "openpyxl>=3.1,<4", "python-pptx>=1,<2"]
+
+[project.scripts]
+findmatch = "search_tool.cli:main"
+
+[project.optional-dependencies]
+test = ["pytest>=9,<10"]
+
+[tool.setuptools.packages.find]
+include = ["search_tool*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: requires real downloaded EmbeddingGemma 2 weights"]
