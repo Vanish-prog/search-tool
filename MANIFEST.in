@@ -1,5 +1,9 @@
 include README.md IDEA.md LICENSE uv.lock runtime.nix install-nixos.sh flake.nix flake.lock
 recursive-include nix *.nix *.json
+include gui/Cargo.toml gui/Cargo.lock gui/README.md
+recursive-include gui/tests *.py
+recursive-include gui/src *.rs
+recursive-include gui/vendor *
 include tests/nix-package.sh
 include bin/findmatch
 recursive-include examples *

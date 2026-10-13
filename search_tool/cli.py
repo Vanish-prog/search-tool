@@ -25,9 +25,18 @@ def main(argv=None, *, engine_factory=None, confirm=None):
         description='Local multimodal directory search using EmbeddingGemma 2.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''Examples:
+  findmatch --gui
+  findmatch --gui ~/Pictures "similar damage" -r ./front.jpg -r ./side.jpg
   findmatch ~/Documents "antenna calibration procedures"
   findmatch ~/Pictures "similar damage" --reference ./example.jpg
   findmatch ~/Recordings --reference ./voice-query.wav --json --limit 5
+
+GUI:
+  --gui opens a native GPUI window; directory and query may be entered there.
+  Attach multiple reference files, browse ranked results, and view previews.
+  Images preview inline; documents show matched text. Audio/video and other
+  files open in their default application. Processing/download require
+  separate approval in the window. --json is CLI-only.
 
 Processing:
   New or changed files prompt: Process these files before searching? [y/N]
@@ -43,7 +52,8 @@ Exit codes:
   0 success; 1 processing/runtime error; 2 cancelled or invalid arguments;
   130 interrupted. See README.md for extraction limits and installation.
 ''')
-    parser.add_argument('directory', type=Path, help='Directory to search recursively (symlinks are skipped)')
+    parser.add_argument('--gui', action='store_true', help='Open the native GPUI interface with multiple reference attachments and result previews; directory/query are optional')
+    parser.add_argument('directory', nargs='?', type=Path, help='Directory to search recursively (required without --gui; symlinks are skipped)')
     parser.add_argument('query', nargs='?', default='', help='Natural-language query; optional when using --reference')
     parser.add_argument('--reference', '-r', action='append', type=Path, default=[], help='Reference file to combine with the query; repeat for multiple files')
     parser.add_argument('--cache-dir', type=Path, default=Path(os.environ.get('XDG_CACHE_HOME', Path.home() / '.cache')) / 'findmatch', help='Model/index storage outside the search directory (default: $XDG_CACHE_HOME/findmatch or ~/.cache/findmatch)')
@@ -51,6 +61,15 @@ Exit codes:
     parser.add_argument('--limit', type=int, default=10, help='Maximum number of results (default: 10; must be positive)')
     parser.add_argument('--json', action='store_true', help='Print results as JSON; prompts remain on stderr')
     args = parser.parse_args(argv)
+    if args.gui:
+        if args.json:
+            parser.error('--json cannot be combined with --gui')
+        if args.limit < 1:
+            parser.error('--limit must be positive')
+        from .gui import launch
+        return launch(args)
+    if args.directory is None:
+        parser.error('directory is required without --gui')
     lock = None
     try:
         root = args.directory.resolve(strict=True)

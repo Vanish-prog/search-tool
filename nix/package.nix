@@ -1,4 +1,4 @@
-{ lib, stdenv, python312, uv, fetchurl, makeWrapper, ffmpeg, poppler-utils }:
+{ lib, stdenv, python312, uv, fetchurl, makeWrapper, ffmpeg, poppler-utils, gui }:
 let
   wheels = map (wheel: fetchurl { inherit (wheel) url sha256; name = wheel.name; })
     (builtins.fromJSON (builtins.readFile ./wheels-x86_64-linux.json));
@@ -26,6 +26,7 @@ in stdenv.mkDerivation {
     cp -r search_tool "$out/lib/findmatch/source/"
     cp README.md LICENSE "$out/share/doc/findmatch/"
     makeWrapper "$out/lib/findmatch/venv/bin/python" "$out/bin/findmatch" \
+      --set FINDMATCH_GUI_BINARY "${gui}/bin/findmatch-gui" \
       --prefix PYTHONPATH : "$out/lib/findmatch/source" \
       --prefix PATH : ${lib.makeBinPath [ ffmpeg poppler-utils ]} \
       --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ stdenv.cc.cc.lib ]} \
@@ -38,7 +39,7 @@ in stdenv.mkDerivation {
     export PYTHONPATH="$out/lib/findmatch/source"
     export LD_LIBRARY_PATH=${lib.makeLibraryPath [ stdenv.cc.cc.lib ]}
     export PATH=${lib.makeBinPath [ ffmpeg poppler-utils ]}:$PATH
-    "$out/lib/findmatch/venv/bin/python" -m pytest tests/test_core.py tests/test_cli.py tests/test_extract.py -q
+    "$out/lib/findmatch/venv/bin/python" -m pytest tests/test_core.py tests/test_cli.py tests/test_gui.py tests/test_extract.py -q
     "$out/bin/findmatch" --help > "$TMPDIR/help"
     runHook postInstallCheck
   '';

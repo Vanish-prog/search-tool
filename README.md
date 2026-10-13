@@ -22,6 +22,28 @@ Unchanged files reuse SQLite embeddings. Deleted files are removed from the dire
 
 Results contain absolute file paths, cosine scores, modality, best-matching chunk location, and snippets. One result per file, ranked by its highest-scoring chunk. Scores are similarities, **not probabilities**; top results may still be unrelated. JSON goes to stdout; progress, errors, and confirmations go to stderr.
 
+## Native GUI
+
+```sh
+findmatch --gui
+findmatch --gui ~/Pictures "similar damage" -r ./front.jpg -r ./side.jpg
+```
+
+The GPUI window uses the same local search engine and index as the CLI. Choose a directory, enter a query, and attach multiple reference files (or search with references alone). Remove attachments individually. Search and processing run off the UI thread; approval for indexing and model download is requested separately in the window. Cancel stops the running search.
+
+Ranked results have image previews where supported. Select a result for its image or matching text snippet, path, location, modality, and similarity score. Audio/video and full documents can be opened with their default application; embedded media playback and full document rendering are not provided. Previewing a result does not modify it.
+
+The Nix package includes the native frontend and its runtime libraries. Python-only installations keep the CLI but require a separately built frontend for `--gui`:
+
+```sh
+nix develop --command cargo build --manifest-path gui/Cargo.toml
+./bin/findmatch --gui
+# Rust tests (including GPUI event/render tests):
+nix develop --command cargo test --manifest-path gui/Cargo.toml
+```
+
+`--limit`, `--cache-dir`, `--reference`, and `--rebuild` initialize the GUI. `--json` is CLI-only and cannot be combined with `--gui`. A graphical Wayland/X11 session with a working Vulkan driver is required; `--help` never starts a window or loads/downloads model weights.
+
 ## Supported content
 
 - UTF-8/UTF-16 text, source code, CSV, JSON, configuration, and extensionless text: overlapping 1,800-character chunks.
@@ -38,7 +60,7 @@ Limits: text 32 MiB, Office ZIP uncompressed content 64 MiB, recordings 2 hours;
 
 ## NixOS installation
 
-The flake provides a self-contained **x86_64-linux** package: Python, locked Python wheels, FFmpeg, Poppler, and native runtime paths are supplied by Nix. It does not depend on the checkout's virtual environment or `~/.local/bin`. ARM Linux and other architectures are not packaged yet.
+The flake provides a self-contained **x86_64-linux** package: Python, locked Python wheels, FFmpeg, Poppler, the GPUI frontend, and native runtime paths are supplied by Nix. It does not depend on the checkout's virtual environment or `~/.local/bin`. ARM Linux and other architectures are not packaged yet.
 
 ```sh
 # Run without permanently installing:
@@ -113,4 +135,4 @@ findmatch ./examples/demo "red circle" -r ./examples/demo/circle.png
 - Runtime: LiteRT-LM 0.18.0, CPU backend (4 threads).
 - Model card / task prefixes: https://huggingface.co/google/embeddinggemma-2
 
-The quantized model is Apache-2.0 per its published model card. Downloaded weights are not bundled with the source. This initial release is a CLI; a NixOS-managed background service is deferred.
+The quantized model is Apache-2.0 per its published model card. Downloaded weights are not bundled with the source. Both CLI and optional GPUI modes are available; a NixOS-managed background service is deferred.
