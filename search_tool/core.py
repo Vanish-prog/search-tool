@@ -41,6 +41,7 @@ class Index:
             CREATE TABLE IF NOT EXISTS files (path TEXT PRIMARY KEY, size INTEGER, mtime INTEGER, ctime INTEGER);
             CREATE TABLE IF NOT EXISTS chunks (path TEXT REFERENCES files(path) ON DELETE CASCADE,
                 kind TEXT, location TEXT, snippet TEXT, vector BLOB);
+            CREATE TABLE IF NOT EXISTS embeddings (key TEXT PRIMARY KEY, vector BLOB NOT NULL);
         ''')
         row = self.db.execute('SELECT identity FROM meta').fetchone()
         if row and row[0] != identity:
@@ -70,6 +71,28 @@ class Index:
                 v = v / np.linalg.norm(v)
                 self.db.execute('INSERT INTO chunks VALUES (?,?,?,?,?)',
                                 (path, kind, location, snippet, v.astype('<f4').tobytes()))
+
+    def embedding(self, chunk, engine):
+        """Reuse exact model inputs, independently of filenames and chunk locations."""
+        import hashlib
+        digest = hashlib.sha256()
+        digest.update(chunk.kind.encode('utf-8') + b'\x00')
+        if chunk.kind == 'text':
+            digest.update(chunk.value.strip().encode('utf-8'))
+        else:
+            with open(chunk.value, 'rb') as stream:
+                for block in iter(lambda: stream.read(1024 * 1024), b''):
+                    digest.update(block)
+        key = digest.hexdigest()
+        row = self.db.execute('SELECT vector FROM embeddings WHERE key=?', (key,)).fetchone()
+        if row:
+            return np.frombuffer(row[0], dtype='<f4')
+        vector = np.asarray(engine.embed([chunk]), dtype='<f4')
+        if vector.ndim != 1 or not np.isfinite(vector).all() or not np.linalg.norm(vector):
+            raise ValueError('Invalid embedding')
+        with self.db:
+            self.db.execute('INSERT INTO embeddings VALUES (?,?)', (key, vector.tobytes()))
+        return vector
 
     def remove(self, paths):
         with self.db:

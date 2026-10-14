@@ -58,6 +58,36 @@ def test_yes_indexes_searches_and_reuses_unchanged_files(tmp_path, capsys):
     assert Path(output[0]['path']).name == 'food.txt'
 
 
+def test_duplicate_and_renamed_content_reuses_embeddings(tmp_path, capsys):
+    root = tmp_path / 'files'
+    root.mkdir()
+    (root / 'a.txt').write_text('antenna calibration')
+    (root / 'b.txt').write_text('antenna calibration')
+    cache = tmp_path / 'cache'
+    documents = []
+
+    class CountingEngine(TinyEngine):
+        def embed(self, chunks, query=False):
+            if not query:
+                documents.append(chunks[0].value)
+            return super().embed(chunks, query=query)
+
+    argv = [str(root), 'antenna', '--cache-dir', str(cache), '--json']
+    assert main(argv, engine_factory=CountingEngine, confirm=lambda _: True) == 0
+    hits = json.loads(capsys.readouterr().out)
+    assert len(hits) == 2
+    assert documents == ['antenna calibration']
+    (root / 'a.txt').rename(root / 'renamed.txt')
+    assert main(argv, engine_factory=CountingEngine, confirm=lambda _: True) == 0
+    hits = json.loads(capsys.readouterr().out)
+    assert {Path(h['path']).name for h in hits} == {'b.txt', 'renamed.txt'}
+    assert documents == ['antenna calibration']
+    (root / 'renamed.txt').write_text('different contents')
+    assert main(argv, engine_factory=CountingEngine, confirm=lambda _: True) == 0
+    capsys.readouterr()
+    assert documents == ['antenna calibration', 'different contents']
+
+
 def test_bad_query_and_reference_fail_before_model_loading(tmp_path, capsys):
     root = tmp_path / 'files'
     root.mkdir()

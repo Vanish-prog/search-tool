@@ -39,6 +39,8 @@ GUI:
   separate approval in the window. --json is CLI-only.
 
 Processing:
+  Vision inference tries a compatible GPU and falls back to CPU automatically.
+  Set FINDMATCH_VISION_BACKEND=cpu to disable probing, or gpu to require GPU.
   New or changed files prompt: Process these files before searching? [y/N]
   Only y/yes proceeds. No, blank input, or EOF cancels processing and search.
   Unchanged files reuse the index; deleted files are removed from it.
@@ -131,7 +133,7 @@ Exit codes:
                         chunks = extract(root / rel, Path(directory))
                         if not chunks:
                             raise ValueError(f'No searchable content: {rel}')
-                        encoded = [(c.kind, c.location, c.snippet, engine.embed([c])) for c in chunks]
+                        encoded = [(c.kind, c.location, c.snippet, index.embedding(c, engine)) for c in chunks]
                         stat = (root / rel).stat()
                         if (stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns) != found[rel]:
                             raise ValueError(f'File changed while processing: {rel}; retry search')

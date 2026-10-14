@@ -20,6 +20,25 @@ New or changed files trigger **Process these files before searching? [y/N]**. On
 
 Unchanged files reuse SQLite embeddings. Deleted files are removed from the directory's index. `--rebuild` asks permission to replace the index. File change detection uses size, nanosecond modification time, and change time. Indexes are specific to a canonical directory path and model/extractor version.
 
+Indexing also caches embeddings by exact model input within each directory index. Duplicate decoded images/audio and identical text chunks share inference work while retaining separate filenames, snippets, and result locations. Renames and timestamp-only changes can reuse cached inputs after extraction. Queries/references are not served from this document cache. Existing indexes gain the cache automatically, but older entries are not backfilled until processed again; do not rebuild merely to enable it. Cached vectors remain available after file deletion until `--rebuild` clears the index, and increase index storage. Consent is still required for new or changed files.
+
+The initial pass over unique photos is inference-bound; content reuse does not accelerate unique inputs. Videos can be particularly expensive because every sampled frame and audio segment needs an embedding. No image resolution, sampling rate, model, or embedding quality is reduced by caching.
+
+### GPU vision acceleration
+
+By default, `FINDMATCH_VISION_BACKEND=auto` tries the GPU image encoder and falls back to CPU if initialization fails. If an image inference call fails on GPU, auto mode switches to CPU and retries once; later calls stay on CPU. Text and audio stay on CPU. Backend selection and fallback messages go to stderr (GUI progress), never JSON stdout. Processing and model-download permission gates are unchanged.
+
+A compatible integrated GPU can accelerate vision; a dedicated GPU is not required. The Nix package includes the Vulkan loader, but the host must supply compatible graphics drivers (on NixOS, normally through `hardware.graphics`). Not every GPU/driver combination is supported or faster, and software Vulkan implementations may be selected by the runtime. CPU-only machines remain supported. To override selection for both CLI and GUI:
+
+```sh
+FINDMATCH_VISION_BACKEND=cpu findmatch ~/Pictures "red car"
+FINDMATCH_VISION_BACKEND=gpu findmatch --gui
+```
+
+`cpu` skips GPU probing; `gpu` requires GPU initialization and does not silently fall back. No smaller model, reduced image resolution, or lower vision token budget is used. GPU numerical results differ slightly from CPU, so identical rankings cannot be guaranteed; representative retrieval-quality validation is still recommended. Existing embeddings remain usable across backends without rebuilding; switching the override does not recompute already-cached vectors. For an entirely CPU-generated index, select `cpu` and explicitly approve `--rebuild`.
+
+On the exercised Core Ultra 5 125U integrated GPU, warmed inference on two demo images averaged 0.64 seconds versus 1.11 seconds on CPU. This is a small illustrative benchmark, not a throughput or quality guarantee for other images/hardware.
+
 Results contain absolute file paths, cosine scores, modality, best-matching chunk location, and snippets. One result per file, ranked by its highest-scoring chunk. Scores are similarities, **not probabilities**; top results may still be unrelated. JSON goes to stdout; progress, errors, and confirmations go to stderr.
 
 ## Native GUI
