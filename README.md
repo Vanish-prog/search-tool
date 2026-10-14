@@ -16,13 +16,21 @@ findmatch ~/Pictures "similar damage" --reference ./example.jpg
 findmatch ~/Recordings --reference ./voice-query.wav --json --limit 5
 ```
 
-New or changed files trigger **Process these files before searching? [y/N]**. Only `y` or `yes` proceeds. No, blank input, or EOF exits with code 2, without processing or searching. There is intentionally no automatic-yes option. On first use, a separate prompt authorizes downloading the model (484,622,336 bytes).
+New or changed files trigger **Process these files before searching? [y/N]**. Only `y` or `yes` proceeds. No, blank input, or EOF exits with code 2, without processing or searching. There is intentionally no automatic-yes option. On first use, a separate prompt authorizes downloading the model (484,622,336 bytes); the download reports its percentage on stderr.
 
 Unchanged files reuse SQLite embeddings. Deleted files are removed from the directory's index. `--rebuild` asks permission to replace the index. File change detection uses size, nanosecond modification time, and change time. Indexes are specific to a canonical directory path and model/extractor version.
 
 Indexing also caches embeddings by exact model input within each directory index. Duplicate decoded images/audio and identical text chunks share inference work while retaining separate filenames, snippets, and result locations. Renames and timestamp-only changes can reuse cached inputs after extraction. Queries/references are not served from this document cache. Existing indexes gain the cache automatically, but older entries are not backfilled until processed again; do not rebuild merely to enable it. Cached vectors remain available after file deletion until `--rebuild` clears the index, and increase index storage. Consent is still required for new or changed files.
 
 The initial pass over unique photos is inference-bound; content reuse does not accelerate unique inputs. Videos can be particularly expensive because every sampled frame and audio segment needs an embedding. No image resolution, sampling rate, model, or embedding quality is reduced by caching.
+
+### Indexing progress and long runs
+
+A large library can legitimately take hours; that is work in progress, not a hang. Progress goes to stderr for every file, for every chunk of files that have many chunks (video frames, audio segments, scanned pages), and for each download percentage step, so a supervising front end can tell real work from a stalled backend. JSON stdout remains only the result array.
+
+Extraction of the next files runs on a bounded producer thread while the current file is being embedded, so decoding, rendering and subprocess calls no longer serialize against inference. The look-ahead is two files: memory and scratch-disk use stay flat no matter how large the library is, and each file's extraction scratch directory is removed as soon as its embeddings are stored, including when a file fails or the run is aborted. Only one thread touches the index and the model; per-file failures, consent gates and file-change checks behave exactly as before.
+
+The native GUI enforces a progress deadline, not a total runtime limit: it only stops a search after **15 minutes without any backend output**, and time spent waiting for your approval in a consent dialog never counts. Indexing an 11,000-file photo library therefore runs to completion instead of being killed at an hour.
 
 ### GPU vision acceleration
 
@@ -48,7 +56,7 @@ findmatch --gui
 findmatch --gui ~/Pictures "similar damage" -r ./front.jpg -r ./side.jpg
 ```
 
-The GPUI window uses the same local search engine and index as the CLI. Choose a directory, enter a query, and attach multiple reference files (or search with references alone). Remove attachments individually. Search and processing run off the UI thread; approval for indexing and model download is requested separately in the window. Cancel stops the running search.
+The GPUI window uses the same local search engine and index as the CLI. Choose a directory, enter a query, and attach multiple reference files (or search with references alone). Remove attachments individually. Search and processing run off the UI thread; approval for indexing and model download is requested separately in the window. Cancel stops the running search. Searches are supervised by the backend's own progress: a search that keeps reporting work runs as long as it needs, and only 15 minutes of complete silence — with no consent dialog open — is treated as a stalled backend and stopped.
 
 Ranked results have image previews where supported. Select a result for its image or matching text snippet, path, location, modality, and similarity score. Audio/video and full documents can be opened with their default application; embedded media playback and full document rendering are not provided. Previewing a result does not modify it.
 

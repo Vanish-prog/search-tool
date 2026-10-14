@@ -31,12 +31,31 @@ def test_real_model_text_and_image_embeddings(tmp_path):
 def test_download_rejects_bad_checksum(tmp_path, monkeypatch):
     from search_tool.model import download_model
     import urllib.request
-    def wrong(url, path):
+    def wrong(url, path, report=None):
         Path(path).write_bytes(b'wrong model')
     monkeypatch.setattr(urllib.request, 'urlretrieve', wrong)
     with pytest.raises(ValueError, match='checksum'):
         download_model(tmp_path / 'model.litertlm')
     assert not (tmp_path / 'model.litertlm').exists()
+
+
+def test_download_reports_bounded_progress_so_a_silent_fetch_is_visible(tmp_path, monkeypatch, capsys):
+    from search_tool.model import download_model
+    import urllib.request
+    def fake(url, path, report=None):
+        assert report is not None, 'a silent download is indistinguishable from a stalled backend'
+        for block in range(1, 101):
+            report(block, 5 * 1024 * 1024, 100 * 5 * 1024 * 1024)  # 5 MiB per block, 500 MiB total
+            Path(path).write_bytes(b'x')
+    monkeypatch.setattr(urllib.request, 'urlretrieve', fake)
+    monkeypatch.setattr('search_tool.model.MODEL_SHA256', 'x'.rjust(64, '0'))
+    monkeypatch.setattr('search_tool.model.hashlib.file_digest', lambda stream, name: type('D', (), {'hexdigest': lambda self: 'x'.rjust(64, '0')})())
+    assert download_model(tmp_path / 'model.litertlm') is None
+    lines = [line for line in capsys.readouterr().err.splitlines() if line.startswith('Downloading EmbeddingGemma 2:')]
+    percents = [int(line.rstrip('%').split()[-1]) for line in lines]
+    assert percents[0] == 5 and percents[-1] == 100
+    assert percents == sorted(percents)
+    assert len(percents) == 20, f'progress must stay bounded, got {len(percents)} lines'
 
 
 def test_model_rejects_context_overflow_instead_of_silently_truncating():

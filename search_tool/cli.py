@@ -3,12 +3,19 @@ import argparse
 import hashlib
 import json
 import os
+import queue
 import sqlite3
 import sys
 import tempfile
+import threading
 import fcntl
 from pathlib import Path
 from .core import scan, plan, Index
+
+# Files whose chunks may be extracted ahead of inference. Bounded so scratch disk
+# and memory stay flat on libraries of any size; extraction is much faster than
+# inference, so a small look-ahead hides it entirely.
+EXTRACTION_LOOKAHEAD = 2
 
 
 def ask(message):
@@ -17,6 +24,68 @@ def ask(message):
         return input().strip().lower() in {'y', 'yes'}
     except EOFError:
         return False
+
+
+def extracted(root, pending, extract):
+    """Yield extraction results in original order, one file ahead of inference.
+
+    Extraction (subprocess decoding, rendering, OCR-ish page rasterizing) and
+    inference use different resources, so a producer thread overlaps them. The
+    bounded queue keeps memory and scratch usage independent of library size, and
+    every extraction error is delivered as data rather than raised so one bad
+    file cannot stop the library.
+    """
+    if not pending:
+        return
+    cancelled = threading.Event()
+    work = queue.Queue(maxsize=max(1, EXTRACTION_LOOKAHEAD))
+
+    def deliver(item):
+        while not cancelled.is_set():
+            try:
+                work.put(item, timeout=0.1)
+                return
+            except queue.Full:
+                continue
+
+    def produce():
+        try:
+            for number, rel in enumerate(pending, 1):
+                if cancelled.is_set():
+                    break
+                scratch = tempfile.TemporaryDirectory(prefix='findmatch-')
+                try:
+                    chunks = extract(root / rel, Path(scratch.name))
+                    if not chunks:
+                        raise ValueError(f'No searchable content: {rel}')
+                except (OSError, ValueError, RuntimeError) as exc:
+                    scratch.cleanup()
+                    deliver((number, rel, None, None, exc))
+                    continue
+                deliver((number, rel, chunks, scratch, None))
+        finally:
+            deliver(None)
+
+    thread = threading.Thread(target=produce, daemon=True)
+    thread.start()
+    try:
+        while True:
+            item = work.get()
+            if item is None:
+                return
+            yield item
+    finally:
+        # Closed early (cancel, interrupt, database error): stop the producer and
+        # release the scratch directories it had already prepared.
+        cancelled.set()
+        while True:
+            try:
+                item = work.get_nowait()
+            except queue.Empty:
+                break
+            if item is not None and item[3] is not None:
+                item[3].cleanup()
+        thread.join(timeout=5)
 
 
 def main(argv=None, *, engine_factory=None, confirm=None):
@@ -130,23 +199,33 @@ Exit codes:
             with Index(dbpath, engine.identity) as index:
                 index.remove(deleted)
                 failed = 0
-                for number, rel in enumerate(pending, 1):
-                    print(f'Processing {number}/{len(pending)}: {rel}', file=sys.stderr)
+                total = len(pending)
+                for number, rel, chunks, scratch, error in extracted(root, pending, extract):
                     try:
-                        with tempfile.TemporaryDirectory(prefix='findmatch-') as directory:
-                            chunks = extract(root / rel, Path(directory))
-                            if not chunks:
-                                raise ValueError(f'No searchable content: {rel}')
-                            encoded = [(c.kind, c.location, c.snippet, index.embedding(c, engine)) for c in chunks]
-                            stat = (root / rel).stat()
-                            if (stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns) != found[rel]:
-                                raise ValueError(f'File changed while processing: {rel}; retry search')
+                        if error is not None or len(chunks) == 1:
+                            print(f'Processing {number}/{total}: {rel}', file=sys.stderr)
+                        if error is not None:
+                            raise error
+                        encoded = []
+                        for position, chunk in enumerate(chunks, 1):
+                            # Long files (video frames, audio segments, scanned
+                            # pages) must report progress too: a silent backend is
+                            # indistinguishable from a stalled one.
+                            if len(chunks) > 1:
+                                print(f'Processing {number}/{total}: {rel} (chunk {position}/{len(chunks)})', file=sys.stderr)
+                            encoded.append((chunk.kind, chunk.location, chunk.snippet, index.embedding(chunk, engine)))
+                        stat = (root / rel).stat()
+                        if (stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns) != found[rel]:
+                            raise ValueError(f'File changed while processing: {rel}; retry search')
                     except (OSError, ValueError, RuntimeError) as exc:
                         index.remove([rel])
                         failed += 1
                         print(f'Skipping {rel}: {exc}', file=sys.stderr)
-                        continue
-                    index.replace(rel, found[rel], encoded)
+                    else:
+                        index.replace(rel, found[rel], encoded)
+                    finally:
+                        if scratch is not None:
+                            scratch.cleanup()
                 if failed:
                     print(f'findmatch: skipped {failed} file(s); results exclude these files. Failed files remain pending for retry.', file=sys.stderr)
                 with tempfile.TemporaryDirectory(prefix='findmatch-query-') as directory:

@@ -16,10 +16,25 @@ IDENTITY = f'embeddinggemma2:{MODEL_REVISION}:768:extract-v1:prefix-model-card'
 
 
 def download_model(path):
+    """Fetch and verify the pinned weights, reporting progress on stderr.
+
+    A silent multi-hundred-megabyte download is indistinguishable from a stalled
+    backend, so the caller (and the GUI supervisor) needs periodic output.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix('.part')
+    printed = [0]
+
+    def progress(blocks, block_size, total):
+        if total <= 0:
+            return
+        percent = min(100, blocks * block_size * 100 // total)
+        if percent >= printed[0] + 5 or percent >= 100:
+            printed[0] = percent
+            print(f'Downloading EmbeddingGemma 2: {percent}%', file=sys.stderr, flush=True)
+
     try:
-        urllib.request.urlretrieve(MODEL_URL, temporary)
+        urllib.request.urlretrieve(MODEL_URL, temporary, progress)
         with temporary.open('rb') as stream:
             digest = hashlib.file_digest(stream, 'sha256').hexdigest()
         if digest != MODEL_SHA256:

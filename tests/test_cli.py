@@ -1,4 +1,5 @@
 import json
+import time
 from pathlib import Path
 from search_tool.cli import main
 
@@ -86,6 +87,135 @@ def test_duplicate_and_renamed_content_reuses_embeddings(tmp_path, capsys):
     assert main(argv, engine_factory=CountingEngine, confirm=lambda _: True) == 0
     capsys.readouterr()
     assert documents == ['antenna calibration', 'different contents']
+
+
+def pipeline_engine(sleeps, lock=None, record=None):
+    """TinyEngine that records completion order, optionally sleeping."""
+    import threading
+    import time
+    lock = lock or threading.Lock()
+
+    class PipelineEngine(TinyEngine):
+        def embed(self, chunks, query=False):
+            if not query:
+                time.sleep(sleeps)
+                if record is not None:
+                    with lock:
+                        record.append(chunks[0].snippet)
+                    return TinyEngine.embed(self, chunks, query=query)
+            return TinyEngine.embed(self, chunks, query=query)
+
+    return PipelineEngine
+
+
+def fake_extractor(chunks_for, *, sleeps=0.0, scratch_marker=None, state=None):
+    """Replacement for search_tool.extract.extract that records its own progress."""
+    import threading
+    import time
+    from search_tool.extract import Chunk
+    lock = state.setdefault('lock', threading.Lock()) if state is not None else threading.Lock()
+
+    def extract(path, scratch):
+        time.sleep(sleeps)
+        if scratch_marker:
+            (Path(scratch) / scratch_marker).write_text('scratch')
+        if state is not None:
+            with lock:
+                state['produced'] = state.get('produced', 0) + 1
+                state['peak'] = max(state.get('peak', 0), state['produced'] - state.get('consumed', 0))
+        count = chunks_for(path)
+        if count is None:
+            raise ValueError(f'{path.name}: synthetic extraction failure')
+        return [Chunk('text', f'{path.name}#{i}', f'line {i}', f'{path.name}#{i}') for i in range(1, count + 1)]
+
+    return extract
+
+
+def test_extraction_overlaps_inference_within_a_bounded_lookahead(tmp_path, monkeypatch, capsys):
+    import search_tool.extract
+    from search_tool.cli import EXTRACTION_LOOKAHEAD, main
+    root = tmp_path / 'files'
+    root.mkdir()
+    for i in range(6):
+        (root / f'file{i}.txt').write_text(f'antenna {i}')
+    state = {}
+    # Extraction far cheaper than inference, as with images: the producer must
+    # fill its look-ahead and then block instead of running the whole library.
+    monkeypatch.setattr(search_tool.extract, 'extract', fake_extractor(lambda _: 1, sleeps=0.01, state=state))
+    completed = []
+
+    class Engine(pipeline_engine(0.2, record=completed)):
+        def embed(self, chunks, query=False):
+            if not query:
+                with state['lock']:
+                    state['consumed'] = state.get('consumed', 0) + 1
+            return super().embed(chunks, query=query)
+
+    assert main([str(root), 'antenna', '--cache-dir', str(tmp_path / 'cache'), '--json'],
+                engine_factory=Engine, confirm=lambda _: True) == 0
+    capsys.readouterr()
+    assert state['peak'] >= 2, 'inference must not wait for the next extraction to start'
+    assert state['peak'] <= EXTRACTION_LOOKAHEAD + 1, f"look-ahead must stay bounded, peaked at {state['peak']}"
+
+
+def test_scratch_directories_are_released_as_the_library_is_processed(tmp_path, monkeypatch, capsys):
+    import search_tool.extract
+    from search_tool.cli import main
+    root = tmp_path / 'files'
+    root.mkdir()
+    for i in range(4):
+        (root / f'file{i}.txt').write_text(f'antenna {i}')
+    scratch = tmp_path / 'scratch'
+    scratch.mkdir()
+    monkeypatch.setenv('TMPDIR', str(scratch))
+    monkeypatch.setattr(search_tool.extract, 'extract', fake_extractor(lambda p: None if p.name == 'file1.txt' else 2, sleeps=0.02, scratch_marker='decoded.png'))
+    assert main([str(root), 'antenna', '--cache-dir', str(tmp_path / 'cache'), '--json'],
+                engine_factory=TinyEngine, confirm=lambda _: True) == 0
+    output = capsys.readouterr()
+    assert 'Skipping file1.txt:' in output.err
+    assert list(scratch.glob('findmatch-*')) == [], 'extraction scratch must not accumulate'
+
+
+def test_every_chunk_reports_progress_so_one_large_file_cannot_look_stalled(tmp_path, monkeypatch, capsys):
+    import search_tool.extract
+    from search_tool.cli import main
+    root = tmp_path / 'files'
+    root.mkdir()
+    (root / 'clip.mp4').write_text('antenna recording')
+    (root / 'note.txt').write_text('antenna note')
+    monkeypatch.setattr(search_tool.extract, 'extract', fake_extractor(lambda p: 3 if p.suffix == '.mp4' else 1))
+    assert main([str(root), 'antenna', '--cache-dir', str(tmp_path / 'cache'), '--json'],
+                engine_factory=TinyEngine, confirm=lambda _: True) == 0
+    err = capsys.readouterr().err
+    for position in (1, 2, 3):
+        assert f'Processing 1/2: clip.mp4 (chunk {position}/3)' in err
+    assert 'Processing 2/2: note.txt' in err
+
+
+def test_producer_stops_and_releases_scratch_when_a_database_error_aborts_the_run(tmp_path, monkeypatch, capsys):
+    import sqlite3
+    import search_tool.extract
+    from search_tool.cli import main
+    from search_tool.core import Index
+    root = tmp_path / 'files'
+    root.mkdir()
+    for i in range(40):
+        (root / f'file{i}.txt').write_text(f'antenna {i}')
+    scratch = tmp_path / 'scratch'
+    scratch.mkdir()
+    monkeypatch.setenv('TMPDIR', str(scratch))
+    monkeypatch.setattr(search_tool.extract, 'extract', fake_extractor(lambda _: 2, sleeps=0.02, scratch_marker='decoded.png'))
+    def broken(*args):
+        raise sqlite3.OperationalError('disk full')
+    monkeypatch.setattr(Index, 'replace', broken)
+    start = time.monotonic()
+    assert main([str(root), 'antenna', '--cache-dir', str(tmp_path / 'cache'), '--json'],
+                engine_factory=TinyEngine, confirm=lambda _: True) == 1
+    elapsed = time.monotonic() - start
+    output = capsys.readouterr()
+    assert 'disk full' in output.err and 'Skipping' not in output.err
+    assert elapsed < 10, f'main must not wait for the producer, took {elapsed:.1f}s'
+    assert list(scratch.glob('findmatch-*')) == [], 'aborted runs must release extraction scratch'
 
 
 def test_failed_file_is_skipped_while_later_files_are_indexed_and_searched(tmp_path, capsys):

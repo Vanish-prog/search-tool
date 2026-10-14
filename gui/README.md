@@ -12,6 +12,13 @@ are denied. Consent is never persisted or reused across searches. Cancel and
 window close kill the process group, reap the backend and join pipe readers.
 Results are limited, ranked, and constrained to existing files beneath the root.
 
+Long libraries are supervised by progress, not by a total runtime budget:
+`STALL_TIMEOUT` (15 minutes) is the longest the backend may stay *silent*, and
+every stderr line — per-file and per-chunk indexing progress, download
+percentages, backend selection — restarts it. Waiting for a consent decision
+also suspends it, so leaving a dialog open cannot kill a healthy search. Only a
+backend that stops reporting progress is terminated and reported as timed out.
+
 Images use GPUI asynchronous path-backed images for cards and the selected
 preview. The selected backend snippet, chunk location, score, kind and path are
 shown. Audio/video/documents use `xdg-open` (no embedded decoder); PDF/Office
@@ -31,10 +38,12 @@ nix develop --command cargo build --manifest-path gui/Cargo.toml --locked
 nix develop --command python3 gui/tests/native_smoke.py gui/target/debug/findmatch-gui
 ```
 
-19 Rust tests cover launch flags, literal Python-module arguments/multiple references,
+23 Rust tests cover launch flags, literal Python-module arguments/multiple references,
 actual Unicode key events, actual rendered card/removal/decline clicks, separate
 newline-free permission prompts, unknown-prompt denial, recursive ranked results
-and metadata, cancellation/reaping, inherited-pipe timeout, and bounded progress.
+and metadata, cancellation/reaping, bounded progress, progress-based stall
+detection (a reporting backend outlives the stall window, a silent one is still
+killed, an open consent dialog is never a stall), and inherited-pipe timeout.
 Tracer-bullet RED/GREEN cycles were exercised for flags, arguments, permission
 protocol, keyboard input, reference/consent state, kill/reap, rendered selectors
 and event backlog. Additional edge-case tests are regression coverage.

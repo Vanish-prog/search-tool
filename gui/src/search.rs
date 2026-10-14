@@ -1,5 +1,13 @@
 use crate::options::Options;
 use std::{ffi::OsString, path::PathBuf};
+
+/// How long the backend may stay completely silent before the GUI treats it as
+/// stalled. Indexing a large library legitimately runs for hours, so this is a
+/// progress deadline rather than a total runtime limit: any backend output
+/// (per-file and per-chunk progress, download percentages) restarts it, and a
+/// waiting consent dialog is not a stalled backend.
+pub const STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(900);
+
 pub fn arguments(o: &Options) -> anyhow::Result<Vec<OsString>> {
     anyhow::ensure!(!o.directory.is_empty(), "Choose a directory first");
     let root = PathBuf::from(&o.directory).canonicalize()?;
@@ -122,14 +130,17 @@ pub fn start(o: &Options) -> anyhow::Result<Worker> {
         command,
         PathBuf::from(&o.directory).canonicalize()?,
         o.limit,
-        std::time::Duration::from_secs(3600),
+        STALL_TIMEOUT,
     ))
 }
+
+/// `stall` is the maximum period without any backend output, not a total runtime
+/// limit: a search that keeps reporting progress runs until it finishes.
 pub fn spawn_command(
     mut command: std::process::Command,
     root: PathBuf,
     limit: usize,
-    timeout: std::time::Duration,
+    stall: std::time::Duration,
 ) -> Worker {
     let (tx, progress) = std::sync::mpsc::sync_channel(127);
     let (finished, completion) = std::sync::mpsc::sync_channel(1);
@@ -142,7 +153,7 @@ pub fn spawn_command(
     let stop = cancel.clone();
     let thread = std::thread::spawn(move || {
         let result =
-            run(&mut command, &root, limit, timeout, &stop, &tx, &rx).map_err(|e| format!("{e:#}"));
+            run(&mut command, &root, limit, stall, &stop, &tx, &rx).map_err(|e| format!("{e:#}"));
         // Exactly one completion is produced, so this never waits on UI polling.
         let _ = finished.try_send(Event::Finished(result));
     });
@@ -199,7 +210,7 @@ fn run(
     command: &mut std::process::Command,
     root: &std::path::Path,
     limit: usize,
-    timeout: std::time::Duration,
+    stall: std::time::Duration,
     stop: &std::sync::atomic::AtomicBool,
     events: &std::sync::mpsc::SyncSender<Event>,
     answers: &std::sync::mpsc::Receiver<bool>,
@@ -251,7 +262,8 @@ fn run(
             }
         }
     });
-    let begin = Instant::now();
+    // Deadline for silence, not for the run: every backend line restarts it.
+    let mut last_progress = Instant::now();
     let mut diagnostics = Vec::new();
     let mut pending = Vec::new();
     let mut waiting = false;
@@ -262,11 +274,18 @@ fn run(
             failure = Some("Search cancelled".to_string());
             break;
         }
-        if begin.elapsed() > timeout {
-            failure = Some("Search timed out".to_string());
+        if waiting {
+            // Blocked on the user's consent decision, not on stalled work.
+            last_progress = Instant::now();
+        } else if last_progress.elapsed() > stall {
+            failure = Some(format!(
+                "Search timed out: no backend progress for {:.0}s",
+                stall.as_secs_f64()
+            ));
             break;
         }
         for chunk in erx.try_iter() {
+            last_progress = Instant::now();
             diagnostics.extend_from_slice(&chunk);
             if diagnostics.len() > 16384 {
                 diagnostics.drain(..diagnostics.len() - 16384);
@@ -587,6 +606,66 @@ finally:
         {
             Event::Finished(r) => assert!(r.unwrap().is_empty()),
             _ => panic!("Unknown permission must never be presented as processing/download"),
+        }
+    }
+    #[test]
+    fn progressing_backend_is_not_timed_out_by_total_runtime() {
+        let root = tempfile::tempdir().unwrap();
+        let mut c = std::process::Command::new("python3");
+        c.args(["-c", "import sys,time\nfor i in range(15):\n    print(f'Processing {i+1}/15: file.txt', file=sys.stderr, flush=True)\n    time.sleep(0.04)\nprint('[]')"]);
+        let start = std::time::Instant::now();
+        // 15 reporting windows of work, each shorter than the stall window.
+        let w = spawn_command(
+            c,
+            root.path().into(),
+            10,
+            std::time::Duration::from_millis(100),
+        );
+        let mut finished = None;
+        while let Ok(event) = w.events.recv_timeout(std::time::Duration::from_secs(10)) {
+            if let Event::Finished(result) = event {
+                finished = Some(result);
+                break;
+            }
+        }
+        let hits = finished
+            .expect("worker must deliver a completion")
+            .expect("a backend that keeps reporting progress must not be timed out");
+        assert!(hits.is_empty());
+        assert!(
+            start.elapsed() > std::time::Duration::from_millis(500),
+            "the run must outlive the stall window to prove the point"
+        );
+    }
+    #[test]
+    fn waiting_for_user_consent_is_not_a_stall() {
+        let root = tempfile::tempdir().unwrap();
+        let mut c = std::process::Command::new("python3");
+        c.args(["-c", "import sys\nprint('Process these files before searching? [y/N]', end='', file=sys.stderr, flush=True)\nprint('[]' if input() == 'y' else '')"]);
+        let w = spawn_command(
+            c,
+            root.path().into(),
+            10,
+            std::time::Duration::from_millis(150),
+        );
+        assert!(matches!(
+            w.events
+                .recv_timeout(std::time::Duration::from_secs(2))
+                .unwrap(),
+            Event::Consent(Permission::Processing, _)
+        ));
+        // The user deliberates for longer than the stall window.
+        std::thread::sleep(std::time::Duration::from_millis(450));
+        w.answers.send(true).unwrap();
+        loop {
+            if let Event::Finished(r) = w
+                .events
+                .recv_timeout(std::time::Duration::from_secs(3))
+                .unwrap()
+            {
+                assert!(r.unwrap().is_empty());
+                break;
+            }
         }
     }
     #[test]
