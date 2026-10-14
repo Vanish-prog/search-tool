@@ -294,9 +294,12 @@ fn run(
                     }
                     pending.clear();
                 } else if byte == b'\n' {
-                    let _ = events.try_send(Event::Progress(
-                        String::from_utf8_lossy(&pending).trim().to_string(),
-                    ));
+                    let text = String::from_utf8_lossy(&pending).trim().to_string();
+                    if text.starts_with("findmatch: skipped ") {
+                        let _ = send_critical(events, Event::Progress(text), stop);
+                    } else {
+                        let _ = events.try_send(Event::Progress(text));
+                    }
                     pending.clear();
                 }
             }
@@ -505,6 +508,38 @@ finally:
                 .any(|e| matches!(e, Event::Finished(Err(ref e)) if e.contains("cancelled"))),
             "Cancelled worker must deliver Finished even when progress fills the queue"
         );
+    }
+    #[test]
+    fn skipped_summary_is_delivered_even_after_progress_queue_fills() {
+        let root = tempfile::tempdir().unwrap();
+        let ready = root.path().join("ready");
+        let mut c = std::process::Command::new("python3");
+        c.args(["-c", "import sys; sys.stderr.write('Processing file\\n'*1000); sys.stderr.flush(); open(sys.argv[1], 'w').close(); print('findmatch: skipped 1 file(s); results exclude these files. Failed files remain pending for retry.', file=sys.stderr, flush=True); print('[]')"]).arg(&ready);
+        let w = spawn_command(c, root.path().into(), 10, std::time::Duration::from_secs(5));
+        for _ in 0..200 {
+            if ready.exists() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert!(ready.exists());
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        let mut summary = false;
+        loop {
+            match w
+                .events
+                .recv_timeout(std::time::Duration::from_secs(3))
+                .unwrap()
+            {
+                Event::Progress(text) if text.starts_with("findmatch: skipped ") => summary = true,
+                Event::Finished(result) => {
+                    assert!(result.unwrap().is_empty());
+                    assert!(summary, "Skipped summary must arrive before completion");
+                    break;
+                }
+                _ => {}
+            }
+        }
     }
     #[test]
     fn progress_backlog_is_bounded_while_gui_is_not_polling() {

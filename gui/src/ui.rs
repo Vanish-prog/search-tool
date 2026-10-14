@@ -174,6 +174,7 @@ struct SearchApp {
     modal_focused: bool,
     worker: Option<Worker>,
     status: String,
+    skipped_summary: Option<String>,
     focus: FocusHandle,
 }
 impl SearchApp {
@@ -191,6 +192,7 @@ impl SearchApp {
             modal_focused: false,
             worker: None,
             status: "Ready".into(),
+            skipped_summary: None,
             focus: cx.focus_handle(),
         };
         s.directory.update(cx, |f, cx| f.set(o.directory, cx));
@@ -547,13 +549,21 @@ impl SearchApp {
     fn handle(&mut self, event: Event, cx: &mut Context<Self>) {
         match event {
             Event::Consent(p, text) => self.dialog = Some((p, text)),
-            Event::Progress(text) => self.status = text,
+            Event::Progress(text) => {
+                if text.starts_with("findmatch: skipped ") {
+                    self.skipped_summary = Some(text.clone());
+                }
+                self.status = text;
+            }
             Event::Finished(result) => {
                 self.worker = None;
                 self.dialog = None;
                 match result {
                     Ok(hits) => {
                         self.status = format!("{} ranked results", hits.len());
+                        if let Some(summary) = &self.skipped_summary {
+                            self.status.push_str(&format!(" · {summary}"));
+                        }
                         self.hits = hits;
                         self.selected = (!self.hits.is_empty()).then_some(0);
                     }
@@ -600,6 +610,7 @@ impl SearchApp {
         match search::start(&o) {
             Ok(w) => {
                 self.worker = Some(w);
+                self.skipped_summary = None;
                 self.status = "Searching locally…".into();
                 cx.spawn(async move |this, cx| {
                     loop {
@@ -670,6 +681,25 @@ impl SearchApp {
 }
 #[cfg(test)]
 mod tests {
+    #[gpui::test]
+    fn skipped_file_summary_survives_completion(cx: &mut TestAppContext) {
+        let (view, cx) = cx.add_window_view(|_, cx| {
+            SearchApp::new(
+                Options {
+                    limit: 10,
+                    ..Default::default()
+                },
+                cx,
+            )
+        });
+        cx.update(|_, cx| {
+            view.update(cx, |s, cx| {
+                s.handle(super::Event::Progress("findmatch: skipped 1 file(s); results exclude these files. Failed files remain pending for retry.".into()), cx);
+                s.handle(super::Event::Finished(Ok(vec![])), cx);
+                assert!(s.status.contains("skipped 1 file(s)"));
+            })
+        });
+    }
     #[gpui::test]
     fn consent_dismissal_restores_query_keyboard_focus(cx: &mut TestAppContext) {
         let (view, cx) = cx.add_window_view(|window, cx| {

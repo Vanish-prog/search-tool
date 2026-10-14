@@ -44,6 +44,8 @@ Processing:
   New or changed files prompt: Process these files before searching? [y/N]
   Only y/yes proceeds. No, blank input, or EOF cancels processing and search.
   Unchanged files reuse the index; deleted files are removed from it.
+  Failed files are skipped and reported; results exclude them. They remain
+  pending for retry. Invalid references and database errors still stop search.
   The initial model download requires separate permission. Search is local.
 
 File support:
@@ -127,17 +129,26 @@ Exit codes:
                 dbpath.unlink(missing_ok=True)
             with Index(dbpath, engine.identity) as index:
                 index.remove(deleted)
+                failed = 0
                 for number, rel in enumerate(pending, 1):
                     print(f'Processing {number}/{len(pending)}: {rel}', file=sys.stderr)
-                    with tempfile.TemporaryDirectory(prefix='findmatch-') as directory:
-                        chunks = extract(root / rel, Path(directory))
-                        if not chunks:
-                            raise ValueError(f'No searchable content: {rel}')
-                        encoded = [(c.kind, c.location, c.snippet, index.embedding(c, engine)) for c in chunks]
-                        stat = (root / rel).stat()
-                        if (stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns) != found[rel]:
-                            raise ValueError(f'File changed while processing: {rel}; retry search')
-                        index.replace(rel, found[rel], encoded)
+                    try:
+                        with tempfile.TemporaryDirectory(prefix='findmatch-') as directory:
+                            chunks = extract(root / rel, Path(directory))
+                            if not chunks:
+                                raise ValueError(f'No searchable content: {rel}')
+                            encoded = [(c.kind, c.location, c.snippet, index.embedding(c, engine)) for c in chunks]
+                            stat = (root / rel).stat()
+                            if (stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns) != found[rel]:
+                                raise ValueError(f'File changed while processing: {rel}; retry search')
+                    except (OSError, ValueError, RuntimeError) as exc:
+                        index.remove([rel])
+                        failed += 1
+                        print(f'Skipping {rel}: {exc}', file=sys.stderr)
+                        continue
+                    index.replace(rel, found[rel], encoded)
+                if failed:
+                    print(f'findmatch: skipped {failed} file(s); results exclude these files. Failed files remain pending for retry.', file=sys.stderr)
                 with tempfile.TemporaryDirectory(prefix='findmatch-query-') as directory:
                     query = [Chunk('text', args.query, 'query', args.query)] if args.query.strip() else []
                     for reference in args.reference:
